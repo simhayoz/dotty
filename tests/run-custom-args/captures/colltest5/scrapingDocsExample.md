@@ -68,6 +68,20 @@ java.lang.UnsupportedOperationException: derivedAnnotation(Tree)
    |missing argument for parameter v1 of method apply in trait Function1: (v1: Unit): Unit
 ```
 
+- When running with `-Xprint:cc`:
+```console
+scalac -Ycc -Xprint:cc -classpath jsoup-1.14.3.jar tests/run-custom-args/captures/colltest5/CollectionStrawManCC5_1.scala tests/run-custom-args/captures/colltest5/ScrapingDocs.scala
+...
+java.lang.AssertionError: NoDenotation.owner
+	at dotty.tools.dotc.core.SymDenotations$NoDenotation$.owner(SymDenotations.scala:2502)
+	at dotty.tools.dotc.core.SymDenotations$SymDenotation.copySymDenotation$default$2(SymDenotations.scala:1535)
+	at dotty.tools.dotc.transform.Recheck$.updateInfoBetween(Recheck.scala:45)
+	at dotty.tools.dotc.cc.Setup.traverse(Setup.scala:376)
+	at dotty.tools.dotc.ast.Trees$Instance$TreeTraverser.apply(Trees.scala:1635)
+	at dotty.tools.dotc.ast.Trees$Instance$TreeTraverser.apply(Trees.scala:1635)
+	at dotty.tools.dotc.ast.Trees$Instance$TreeAccumulator.foldOver(Trees.scala:1605)
+```
+
 ### Testing try/catch
 
 1. Both
