@@ -1,3 +1,4 @@
+// scalac -Ycc -classpath jsoup-1.14.3.jar tests/run-custom-args/captures/colltest5/CollectionStrawManCC5_1.scala tests/run-custom-args/captures/colltest5/external-links-example/ExternalLinks.scala
 import org.jsoup._
 import collection.JavaConverters._
 import language.experimental.saferExceptions
@@ -11,7 +12,7 @@ object ExternalLinks {
     val l: scala.collection.Iterator[A] = buf.iterator
     val newList = ListBuffer[A]()
     while (l.hasNext) {
-      newList += l.next() 
+      newList += l.next()
     }
     newList
 
@@ -22,7 +23,7 @@ object ExternalLinks {
         if (these.next() == elem) return true
       }
       false
-    
+
     // Simpler implementation of `withFilter`
     def withFilter(p: A => Boolean): ListBuffer[A] =
       val these: Iterator[A] = l.iterator
@@ -39,7 +40,7 @@ object ExternalLinks {
     val start = "https://www.lihaoyi.com/"
     val seen: ListBuffer[String] = ListBuffer(start)
     val queue: ArrayBuffer[String] = ArrayBuffer(start)
-    
+
     while(!queue.isEmpty){
       val current = queue(0)
       queue.trimStart(1)
@@ -69,7 +70,7 @@ object ExternalLinks {
           }
       }
     }
-    
+
     // println(seen)
     println(seen.length)
   }

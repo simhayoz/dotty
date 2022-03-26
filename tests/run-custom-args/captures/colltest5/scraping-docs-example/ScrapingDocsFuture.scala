@@ -1,9 +1,16 @@
+// scalac -Ycc -classpath jsoup-1.14.3.jar tests/run-custom-args/captures/colltest5/CollectionStrawManCC5_1.scala tests/run-custom-args/captures/colltest5/scraping-docs-example/ScrapingDocsFuture.scala
 import org.jsoup._
 import collection.JavaConverters._
 import java.io.IOException
+import scala.util.{Failure, Success}
+import scala.runtime.stdLibPatches.language.future
+import scala.concurrent.duration._
+import scala.concurrent._
 
-object ScrapingDocs {
+object ScrapingDocsFuture {
   import language.experimental.saferExceptions
+
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   import colltest5.strawman.collections.*
   import CollectionStrawMan5.*
@@ -20,8 +27,8 @@ object ScrapingDocs {
     val indexDoc: nodes.Document = Jsoup.connect("https://developer.mozilla.org/en-US/docs/Web/API").get()
     val links: List[nodes.Element] = fromMutableBuffer(indexDoc.select("h2#interfaces").nextAll.select("div.index a").asScala)
     val linkData: List[(String, String, String)] = links.map(link => (link.attr("href"), link.attr("title"), link.text))
-    val closures: List[{*}Unit -> (String, String, String, String, List[(String, String)])] =
-      linkData.map{case (url, tooltip, name) => _ => {
+    val futures: List[Future[(String, String, String, String, List[(String, String)])]] = linkData.map{case (url, tooltip, name) => {
+      Future {
         println("Scraping " + name)
         val doc = Jsoup.connect("https://developer.mozilla.org" + url).get()
         val summary = doc.select("article#wikiArticle > p").asScala.headOption match {
@@ -32,7 +39,8 @@ object ScrapingDocs {
         .asScala)
         .map(el => (el.text, el.nextElementSibling match {case null => ""; case x => x.text}))
         (url, tooltip, name, summary, methodsAndProperties)
-      }}
-    for (closure <- closures) closure(())
+      }
+    }}
+    for (future <- futures) Await.result(future, Duration(1000, MILLISECONDS))
   }
 }
