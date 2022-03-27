@@ -116,7 +116,7 @@ object Checking {
         if tp.isUnreducibleWild then
           report.errorOrMigrationWarning(
             showInferred(UnreducibleApplication(tycon), tp, tpt),
-            tree.srcPos)
+            tree.srcPos, from = `3.0`)
       case _ =>
     }
     def checkValidIfApply(using Context): Unit =
@@ -188,7 +188,8 @@ object Checking {
   def checkRealizable(tp: Type, pos: SrcPos, what: String = "path")(using Context): Unit = {
     val rstatus = realizability(tp)
     if (rstatus ne Realizable)
-      report.errorOrMigrationWarning(em"$tp is not a legal $what\nsince it${rstatus.msg}", pos)
+      report.errorOrMigrationWarning(
+        em"$tp is not a legal $what\nsince it${rstatus.msg}", pos, from = `3.0`)
   }
 
   /** Given a parent `parent` of a class `cls`, if `parent` is a trait check that
@@ -537,6 +538,7 @@ object Checking {
     checkCombination(Private, Protected)
     checkCombination(Abstract, Override)
     checkCombination(Private, Override)
+    if sym.isType && !sym.isClass then checkCombination(Private, Opaque)
     checkCombination(Lazy, Inline)
     // The issue with `erased inline` is that the erased semantics get lost
     // as the code is inlined and the reference is removed before the erased usage check.
@@ -640,7 +642,7 @@ object Checking {
     }
     val notPrivate = new NotPrivate
     val info = notPrivate(sym.info)
-    notPrivate.errors.foreach(error => report.errorOrMigrationWarning(error(), sym.srcPos))
+    notPrivate.errors.foreach(error => report.errorOrMigrationWarning(error(), sym.srcPos, from = `3.0`))
     info
   }
 
@@ -1410,6 +1412,7 @@ trait ReChecking extends Checking {
   override def checkNoModuleClash(sym: Symbol)(using Context) = ()
   override def checkCanThrow(tp: Type, span: Span)(using Context): Tree = EmptyTree
   override def checkCatch(pat: Tree, guard: Tree)(using Context): Unit = ()
+  override def checkFeature(name: TermName, description: => String, featureUseSite: Symbol, pos: SrcPos)(using Context): Unit = ()
 }
 
 trait NoChecking extends ReChecking {
@@ -1432,5 +1435,4 @@ trait NoChecking extends ReChecking {
   override def checkMembersOK(tp: Type, pos: SrcPos)(using Context): Type = tp
   override def checkInInlineContext(what: String, pos: SrcPos)(using Context): Unit = ()
   override def checkValidInfix(tree: untpd.InfixOp, meth: Symbol)(using Context): Unit = ()
-  override def checkFeature(name: TermName, description: => String, featureUseSite: Symbol, pos: SrcPos)(using Context): Unit = ()
 }

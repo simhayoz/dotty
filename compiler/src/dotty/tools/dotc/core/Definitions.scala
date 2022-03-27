@@ -1545,10 +1545,11 @@ class Definitions {
    * @return true if the dealiased type of `tp` is `TupleN[T1, T2, ..., Tn]`
    */
   def isTupleNType(tp: Type)(using Context): Boolean = {
-    val arity = tp.dealias.argInfos.length
+    val tp1 = tp.dealias
+    val arity = tp1.argInfos.length
     arity <= MaxTupleArity && {
       val tupletp = TupleType(arity)
-      tupletp != null && tp.isRef(tupletp.symbol)
+      tupletp != null && tp1.isRef(tupletp.symbol)
     }
   }
 
@@ -1657,6 +1658,9 @@ class Definitions {
       t2 <- Function2SpecializedParamTypes
     yield
       nme.apply.specializedFunction(r, List(t1, t2)).asTermName
+
+  @tu lazy val FunctionSpecializedApplyNames: collection.Set[Name] =
+    Function0SpecializedApplyNames ++ Function1SpecializedApplyNames ++ Function2SpecializedApplyNames
 
   def functionArity(tp: Type)(using Context): Int = tp.dropDependentRefinement.dealias.argInfos.length - 1
 

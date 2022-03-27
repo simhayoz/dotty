@@ -12,7 +12,6 @@ import scala.reflect.TypeTest
  *     ...
  *  }
  *  ```
- *  @syntax markdown
  */
 transparent inline def quotes(using inline q: Quotes): q.type = q
 
@@ -36,7 +35,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
     *    case '{...} => true // where the contents of the pattern are the contents of `that`
     *    case _ => false
     *  ```
-    *  @syntax markdown
     */
     def matches(that: Expr[Any]): Boolean
 
@@ -97,7 +95,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
    *
    *  See `reflectModule` for full API.
    *
-   *  @syntax markdown
    */
   val reflect: reflectModule
 
@@ -316,7 +313,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
      *  package foo.bar
      *  // package stats
      *  ```
-     *  @syntax markdown
      */
     type PackageClause <: Tree
 
@@ -490,7 +486,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *    ???
          *  }
          *  ```
-         *  @syntax markdown
          */
         def self: Option[ValDef]
         /** Statements within the class
@@ -500,7 +495,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *    ??? // statements
          *  }
          *  ```
-         *  @syntax markdown
          */
         def body: List[Statement]
       end extension
@@ -524,6 +518,8 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
        *  The `rhsFn` is a function that receives references to its parameters and should return
        *  `Some` containing the implementation of the method. Returns `None` the method has no implementation.
        *  Any definition directly inside the implementation should have `symbol` as owner.
+       *
+       *  Use `Symbol.asQuotes` to create the rhs using quoted code.
        *
        *  See also: `Tree.changeOwner`
        */
@@ -551,7 +547,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *  //}
          *  extension (a: A) def f[T]() = ???
          *  ```
-         *  @syntax markdown
          */
         def leadingTypeParams: List[TypeDef]
 
@@ -566,7 +561,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *  //}
          *  extension (a: A) def f[T]() = ???
          *  ```
-         *  @syntax markdown
          */
         def trailingParamss: List[ParamClause]
 
@@ -602,20 +596,50 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
        *  Returns `None` the method has no implementation.
        *  Any definition directly inside the implementation should have `symbol` as owner.
        *
+       *  Use `Symbol.asQuotes` to create the rhs using quoted code.
+       *
        *  See also: `Tree.changeOwner`
        */
       def apply(symbol: Symbol, rhs: Option[Term]): ValDef
       def copy(original: Tree)(name: String, tpt: TypeTree, rhs: Option[Term]): ValDef
       def unapply(vdef: ValDef): (String, TypeTree, Option[Term])
 
-      /** Creates a block `{ val <name> = <rhs: Term>; <body(x): Term> }` */
+      /** Creates a block `{ val <name> = <rhs: Term>; <body(x): Term> }`
+       *
+       *  Usage:
+       *  ```
+       *  ValDef.let(owner, "x", rhs1) { x =>
+       *    ValDef.let(x.symbol.owner, "y", rhs2) { y =>
+       *      // use `x` and `y`
+       *    }
+       *  }
+       *  ```
+       */
       def let(owner: Symbol, name: String, rhs: Term)(body: Ref => Term): Term
 
-      /** Creates a block `{ val x = <rhs: Term>; <body(x): Term> }` */
+      /** Creates a block `{ val x = <rhs: Term>; <body(x): Term> }`
+       *
+       *  Usage:
+       *  ```
+       *  ValDef.let(owner, rhs1) { x =>
+       *    ValDef.let(owner, rhs2) { y =>
+       *      // use `x` and `y`
+       *    }
+       *  }
+       *  ```
+       */
       def let(owner: Symbol, rhs: Term)(body: Ref => Term): Term =
         let(owner, "x", rhs)(body)
 
-      /** Creates a block `{ val x1 = <terms(0): Term>; ...; val xn = <terms(n-1): Term>; <body(List(x1, ..., xn)): Term> }` */
+      /** Creates a block `{ val x1 = <terms(0): Term>; ...; val xn = <terms(n-1): Term>; <body(List(x1, ..., xn)): Term> }`
+       *
+       *  Usage:
+       *  ```
+       *  ValDef.let(owner, rhsList) { xs =>
+       *     ...
+       *  }
+       *  ```
+       */
       def let(owner: Symbol, terms: List[Term])(body: List[Ref] => Term): Term
     }
 
@@ -699,10 +723,20 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
         /** TypeRepr of this term */
         def tpe: TypeRepr
 
-        /** Replace Inlined nodes and InlineProxy references to underlying arguments */
+        /** Replace Inlined nodes and InlineProxy references to underlying arguments.
+         *  The resulting tree is useful for inspection of the value or content of a non-inline argument.
+         *
+         *  Warning: This tree may contain references that are out of scope and should not be used in the generated code.
+         *           This method should only used to port Scala 2 that used to access their outer scope unsoundly.
+         */
         def underlyingArgument: Term
 
-        /** Replace Ident nodes references to the underlying tree that defined them */
+        /** Replace Ident nodes references to the underlying tree that defined them.
+         *  The resulting tree is useful for inspection of the definition of some bindings.
+         *
+         *  Warning: This tree may contain references that are out of scope and should not be used in the generated code.
+         *           This method should only used to port Scala 2 that used to access their outer scope unsoundly.
+         */
         def underlying: Term
 
         /** Converts a partially applied term into a lambda expression */
@@ -1043,7 +1077,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *  ```
          *  - `fun` is `f(1)` in the `Apply` of `f(1)(2)`
          *  - `fun` is `f` in the `Apply` of `f(1)`
-         *  @syntax markdown
          */
         def fun: Term
         /** The arguments (implicitly) passed to the method
@@ -1055,7 +1088,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *  ```
          *  - `args` is `(2)` in the `Apply` of `f(1)(2)`
          *  - `args` is `(1)` in the `Apply` of `f(1)`
-         *  @syntax markdown
          */
         def args: List[Term]
       end extension
@@ -1104,7 +1136,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *  // f(1)[Int](2)
          *  ```
          *  - `fun` is `f(1)` in the `TypeApply` of `f(1)[Int]`
-         *  @syntax markdown
          */
         def fun: Term
         /** The (inferred) type arguments passed to the method
@@ -1123,7 +1154,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *  // f(1)[Int](2)
          *  ```
          *  - `fun` is `[Int]` in the `TypeApply` of `f(1)[Int]`
-         *  @syntax markdown
          */
         def args: List[TypeTree]
       end extension
@@ -1312,7 +1342,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
      *  @note Due to the encoding, in pattern matches the case for `Lambda`
      *        should come before the case for `Block` to avoid mishandling
      *        of `Lambda`.
-     *  @syntax markdown
      */
     val Lambda: LambdaModule
 
@@ -1323,7 +1352,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
        *  Block((DefDef(_, _, params :: Nil, _, Some(body))) :: Nil, Closure(meth, _))
        *  ```
        *  Extracts the parameter definitions and body.
-       *  @syntax markdown
        */
       def unapply(tree: Block): Option[(List[ValDef], Term)]
 
@@ -1331,10 +1359,31 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
        *  ```scala sc:nocompile
        *  Block((DefDef(_, _, params :: Nil, _, Some(rhsFn(meth, paramRefs)))) :: Nil, Closure(meth, _))
        *  ```
+       *
+       * Usage:
+       *  ```
+       *  val mtpe = MethodType(List("arg1"))(_ => List(TypeRepr.of[Int]), _ => TypeRepr.of[Int])
+       *  Lambda(owner, mtpe, {
+       *    case (methSym, List(arg1: Term)) =>
+       *      ValDef.let(methSym, f(arg1)) { ... }
+       *    }
+       *  )
+       *  ```
+       *
+       *  Usage with quotes:
+       *  ```
+       *  val mtpe = MethodType(List("arg1"))(_ => List(TypeRepr.of[Int]), _ => TypeRepr.of[Int])
+       *  Lambda(owner, mtpe, {
+       *    case (methSym, List(arg1: Term)) =>
+       *      given Quotes = methSym.asQuotes
+       *      '{ ... }
+       *    }
+       *  )
+       *  ```
+       *
        *  @param owner: owner of the generated `meth` symbol
        *  @param tpe: Type of the definition
        *  @param rhsFn: Function that receives the `meth` symbol and the a list of references to the `params`
-       *  @syntax markdown
        */
       def apply(owner: Symbol, tpe: MethodType, rhsFn: (Symbol, List[Tree]) => Tree): Block
     }
@@ -2238,7 +2287,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
      *    case TypeParamClause(params: List[TypeDef])
      *    case TermParamClause(params: List[ValDef])
      *  ```
-     *  @syntax markdown
      */
     type ParamClause <: AnyRef
 
@@ -2481,7 +2529,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
         *  }
         *  //}
         *  ```
-        *  @syntax markdown
         */
         def asType: Type[?]
 
@@ -2874,7 +2921,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
      *  ```scala
      *    def foo: Int = ???
      *  ```
-     *  @syntax markdown
      */
     type ByNameType <: TypeRepr
 
@@ -3514,7 +3560,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
        *  ```
        *
        *  For a macro splice, it is the symbol of the definition where the macro expansion happens.
-       *  @syntax markdown
        */
       def spliceOwner: Symbol
 
@@ -3807,6 +3852,34 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
 
         /** Case class or case object children of a sealed trait or cases of an `enum`. */
         def children: List[Symbol]
+
+        /** Returns a nested quote with this symbol as splice owner (`Symbol.spliceOwner`).
+         *
+         *  Changes the owner under which the definition in a quote are created.
+         *
+         *  Usages:
+         *  ```scala
+         *  def rhsExpr(using Quotes): Expr[Unit] = '{ val y = ???; (y, y) }
+         *  def aValDef(using Quotes)(owner: Symbol) =
+         *    val sym = Symbol.newVal(owner, "x", TypeRepr.of[Unit], Flags.EmptyFlags, Symbol.noSymbol)
+         *    val rhs = rhsExpr(using sym.asQuotes).asTerm
+         *    ValDef(sym, Some(rhs))
+         *  ```
+         *
+         *  ```scala
+         *  new TreeMap:
+         *    override def transformTerm(tree: Term)(owner: Symbol): Term =
+         *      tree match
+         *        case tree: Ident =>
+         *          given Quotes = owner.asQuotes
+         *          // Definitions contained in the quote will be owned by `owner`.
+         *          // No need to use `changeOwner` in this case.
+         *          '{ val x = ???; x }.asTerm
+         *  ```
+         */
+        @experimental
+        def asQuotes: Nested
+
       end extension
     }
 
@@ -4362,7 +4435,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
     *    def foldTree(x: X, tree: Tree)(owner: Symbol): X = ???
     *  }
     *  ```
-    *  @syntax markdown
     */
     trait TreeAccumulator[X]:
 
@@ -4467,7 +4539,6 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
     *    override def traverseTree(tree: Tree)(owner: Symbol): Unit = ???
     *  }
     *  ```
-    *  @syntax markdown
     */
     trait TreeTraverser extends TreeAccumulator[Unit]:
 
@@ -4487,7 +4558,9 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
     *    override def transformTree(tree: Tree)(owner: Symbol): Tree = ???
     *  }
     *  ```
-    *  @syntax markdown
+    *
+    *  Use `Symbol.asQuotes` to create quotes with the correct owner within the TreeMap.
+    *
     */
     trait TreeMap:
 

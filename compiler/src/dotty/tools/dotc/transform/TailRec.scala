@@ -3,17 +3,15 @@ package transform
 
 import ast.{TreeTypeMap, tpd}
 import config.Printers.tailrec
-import core.Contexts._
-import core.Constants.Constant
-import core.Flags._
-import core.NameKinds.{TailLabelName, TailLocalName, TailTempName}
-import core.StdNames.nme
-import core.Symbols._
-import reporting._
+import core.*
+import Contexts.*, Flags.*, Symbols.*
+import Constants.Constant
+import NameKinds.{TailLabelName, TailLocalName, TailTempName}
+import StdNames.nme
+import reporting.*
 import transform.MegaPhase.MiniPhase
 import util.LinearSet
 import dotty.tools.uncheckedNN
-
 
 /** A Tail Rec Transformer.
  *
@@ -161,15 +159,26 @@ class TailRec extends MiniPhase {
         val rhsFullyTransformed = varForRewrittenThis match {
           case Some(localThisSym) =>
             val thisRef = localThisSym.termRef
-            new TreeTypeMap(
+            val substitute = new TreeTypeMap(
               typeMap = _.substThisUnlessStatic(enclosingClass, thisRef)
                 .subst(rewrittenParamSyms, varsForRewrittenParamSyms.map(_.termRef)),
               treeMap = {
                 case tree: This if tree.symbol == enclosingClass => Ident(thisRef)
                 case tree => tree
               }
-            ).transform(rhsSemiTransformed)
-
+            )
+            // The previous map will map `This` references to `Ident`s even under `Super`.
+            // This violates super's contract. We fix this by cleaning up `Ident`s under
+            // super, mapping them back to the original `This` reference. This is not
+            // very elegant, but I did not manage to find a cleaner way to handle this.
+            // See pos/tailrec-super.scala for a test case.
+            val cleanup = new TreeMap:
+              override def transform(t: Tree)(using Context) = t match
+                case Super(qual: Ident, mix) if !qual.tpe.isInstanceOf[Types.ThisType] =>
+                  cpy.Super(t)(This(enclosingClass), mix)
+                case _ =>
+                  super.transform(t)
+            cleanup.transform(substitute.transform(rhsSemiTransformed))
           case none =>
             new TreeTypeMap(
               typeMap = _.subst(rewrittenParamSyms, varsForRewrittenParamSyms.map(_.termRef))
@@ -277,11 +286,23 @@ class TailRec extends MiniPhase {
     def yesTailTransform(tree: Tree)(using Context): Tree =
       transform(tree, tailPosition = true)
 
+    /** If not in tail position a tree traversal may not be needed.
+     *
+     *  A recursive  call may still be in tail position if within the return
+     *  expression of a labeled block.
+     *  A tree traversal may also be needed to report a failure to transform
+     *  a recursive call of a @tailrec annotated method (i.e. `isMandatory`).
+     */
+    private def isTraversalNeeded =
+      isMandatory || tailPositionLabeledSyms.size > 0
+
     def noTailTransform(tree: Tree)(using Context): Tree =
-      transform(tree, tailPosition = false)
+      if (isTraversalNeeded) transform(tree, tailPosition = false)
+      else tree
 
     def noTailTransforms[Tr <: Tree](trees: List[Tr])(using Context): List[Tr] =
-      trees.mapConserve(noTailTransform).asInstanceOf[List[Tr]]
+      if (isTraversalNeeded) trees.mapConserve(noTailTransform).asInstanceOf[List[Tr]]
+      else trees
 
     override def transform(tree: Tree)(using Context): Tree = {
       /* Rewrite an Apply to be considered for tail call transformation. */
@@ -432,7 +453,7 @@ class TailRec extends MiniPhase {
 
         case Return(expr, from) =>
           val fromSym = from.symbol
-          val inTailPosition = !fromSym.is(Label) || tailPositionLabeledSyms.contains(fromSym)
+          val inTailPosition = fromSym.is(Label) && tailPositionLabeledSyms.contains(fromSym)
           cpy.Return(tree)(transform(expr, inTailPosition), from)
 
         case _ =>

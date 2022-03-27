@@ -1809,11 +1809,11 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     case _ => false
 
   /** Does type `tp1` have a member with name `name` whose normalized type is a subtype of
-   *  the normalized type of the refinement `tp2`?
+   *  the normalized type of the refinement of `tp2`?
    *  Normalization is as follows: If `tp2` contains a skolem to its refinement type,
    *  rebase both itself and the member info of `tp` on a freshly created skolem type.
    */
-  protected def hasMatchingMember(name: Name, tp1: Type, tp2: RefinedType): Boolean =
+  def hasMatchingMember(name: Name, tp1: Type, tp2: RefinedType): Boolean =
     trace(i"hasMatchingMember($tp1 . $name :? ${tp2.refinedInfo}), mbr: ${tp1.member(name).info}", subtyping) {
 
       // If the member is an abstract type and the prefix is a path, compare the member itself
@@ -2806,6 +2806,9 @@ object TypeComparer {
 
   def matchesType(tp1: Type, tp2: Type, relaxed: Boolean)(using Context): Boolean =
     comparing(_.matchesType(tp1, tp2, relaxed))
+
+  def hasMatchingMember(name: Name, tp1: Type, tp2: RefinedType)(using Context): Boolean =
+    comparing(_.hasMatchingMember(name, tp1, tp2))
 
   def matchingMethodParams(tp1: MethodType, tp2: MethodType)(using Context): Boolean =
     comparing(_.matchingMethodParams(tp1, tp2))

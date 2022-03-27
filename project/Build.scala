@@ -57,7 +57,7 @@ object DottyJSPlugin extends AutoPlugin {
 object Build {
   import ScaladocConfigs._
 
-  val referenceVersion = "3.1.2-RC1"
+  val referenceVersion = "3.1.2-RC2"
 
   val baseVersion = "3.1.3-RC1"
 
@@ -164,13 +164,14 @@ object Build {
     organizationName := "LAMP/EPFL",
     organizationHomepage := Some(url("http://lamp.epfl.ch")),
 
+    // Note: bench/profiles/projects.yml should be updated accordingly.
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",
       "-unchecked",
       "-Xfatal-warnings",
       "-encoding", "UTF8",
-      "-language:existentials,higherKinds,implicitConversions,postfixOps"
+      "-language:implicitConversions"
     ),
 
     (Compile / compile / javacOptions) ++= Seq("-Xlint:unchecked", "-Xlint:deprecation"),
@@ -250,7 +251,7 @@ object Build {
     // Prevent sbt from rewriting our dependencies
     scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(false))),
 
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % Test,
+    libraryDependencies += "com.github.sbt" % "junit-interface" % "0.13.3" % Test,
 
     // If someone puts a source file at the root (e.g., for manual testing),
     // don't pick it up as part of any project.
@@ -518,7 +519,7 @@ object Build {
 
       // get libraries onboard
       libraryDependencies ++= Seq(
-        "org.scala-lang.modules" % "scala-asm" % "9.1.0-scala-1", // used by the backend
+        "org.scala-lang.modules" % "scala-asm" % "9.2.0-scala-1", // used by the backend
         Dependencies.oldCompilerInterface, // we stick to the old version to avoid deprecation warnings
         "org.jline" % "jline-reader" % "3.19.0",   // used by the REPL
         "org.jline" % "jline-terminal" % "3.19.0",
@@ -769,6 +770,7 @@ object Build {
       )
     },
 
+    // Note: bench/profiles/projects.yml should be updated accordingly.
     Compile / scalacOptions ++= Seq("-Yexplicit-nulls"),
 
     repl := (Compile / console).value,
@@ -1279,7 +1281,7 @@ object Build {
 
   lazy val `scaladoc-js-contributors` = project.in(file("scaladoc-js/contributors")).
     enablePlugins(DottyJSPlugin).
-    dependsOn(`scala3-library-bootstrappedJS`).
+    dependsOn(`scaladoc-js-common`).
     settings(
       Test / fork := false,
       scalaJSUseMainModuleInitializer := true,
@@ -1325,7 +1327,7 @@ object Build {
         "org.jsoup" % "jsoup" % "1.14.3", // Needed to process .html files for static site
         Dependencies.`jackson-dataformat-yaml`,
 
-        "com.novocode" % "junit-interface" % "0.11" % "test",
+        "com.github.sbt" % "junit-interface" % "0.13.3" % Test,
       ),
       Compile / mainClass := Some("dotty.tools.scaladoc.Main"),
       Compile / buildInfoKeys := Seq[BuildInfoKey](version),
@@ -1390,6 +1392,7 @@ object Build {
             .add(OutputDir("scaladoc/output/reference"))
             .add(SiteRoot(s"${temp.getAbsolutePath}/docs"))
             .add(ProjectName("Scala 3 Reference"))
+            .remove[VersionsDictionaryUrl]
             .add(SourceLinks(List(
               dottySrcLink(referenceVersion, temp.getAbsolutePath + "=")
             )))
@@ -1488,7 +1491,7 @@ object Build {
       ).evaluated
    )
 
-  val prepareCommunityBuild = taskKey[Unit]("Publish local the compiler and the sbt plugin. Also store the versions of the published local artefacts in two files, community-build/{scala3-bootstrapped.version,sbt-dotty-sbt}.")
+  val prepareCommunityBuild = taskKey[Unit]("Publish local the compiler and the sbt plugin. Also store the versions of the published local artefacts in two files, community-build/{scala3-bootstrapped.version,sbt-injected-plugins}.")
 
   lazy val `community-build` = project.in(file("community-build")).
     dependsOn(dottyLibrary(Bootstrapped)).
@@ -1508,10 +1511,9 @@ object Build {
         // (publishLocal in `scala3-staging`).value
         val pluginText =
           s"""updateOptions in Global ~= (_.withLatestSnapshots(false))
-             |addSbtPlugin("ch.epfl.lamp" % "sbt-dotty" % "$sbtDottyVersion")
              |addSbtPlugin("ch.epfl.lamp" % "sbt-community-build" % "$sbtCommunityBuildVersion")
              |addSbtPlugin("org.scala-js" % "sbt-scalajs" % "$scalaJSVersion")""".stripMargin
-        IO.write(baseDirectory.value / "sbt-dotty-sbt", pluginText)
+        IO.write(baseDirectory.value / "sbt-injected-plugins", pluginText)
         IO.write(baseDirectory.value / "scala3-bootstrapped.version", dottyVersion)
         IO.delete(baseDirectory.value / "dotty-community-build-deps")  // delete any stale deps file
       },
@@ -1802,6 +1804,10 @@ object ScaladocConfigs {
       .add(Revision("main"))
       .add(SnippetCompiler(List("scaladoc-testcases/docs=compile")))
       .add(SiteRoot("scaladoc-testcases/docs"))
+      .add(CommentSyntax(List(
+        "scaladoc-testcases/src/example/comment-md=markdown",
+        "scaladoc-testcases/src/example/comment-wiki=wiki"
+      )))
       .add(ExternalMappings(List(dottyExternalMapping, javaExternalMapping)))
       .withTargets(tastyRoots)
   }
@@ -1831,7 +1837,11 @@ object ScaladocConfigs {
       .add(Revision("main"))
       .add(ExternalMappings(List(javaExternalMapping)))
       .add(DocRootContent(docRootFile.toString))
-      .add(CommentSyntax("wiki"))
+      .add(CommentSyntax(List(
+        s"${dottyLibRoot}=markdown",
+        s"${stdLibRoot}=wiki",
+        "wiki"
+      )))
       .add(VersionsDictionaryUrl("https://scala-lang.org/api/versions.json"))
       .add(DocumentSyntheticTypes(true))
       .add(SnippetCompiler(List(
