@@ -21,7 +21,7 @@ object ScrapingDocs {
     val indexDoc: nodes.Document = Jsoup.connect("https://developer.mozilla.org/en-US/docs/Web/API").get()
     val links: List[nodes.Element] = fromMutableBuffer(indexDoc.select("h2#interfaces").nextAll.select("div.index a").asScala)
     val linkData: List[(String, String, String)] = links.map(link => (link.attr("href"), link.attr("title"), link.text))
-    val closures: List[{*}Unit -> (String, String, String, String, List[(String, String)])] =
+    val closures: List[Unit => (String, String, String, String, List[(String, String)])] =
       linkData.map{case (url, tooltip, name) => _ => {
         println("Scraping " + name)
         val doc = Jsoup.connect("https://developer.mozilla.org" + url).get()
