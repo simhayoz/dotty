@@ -17,6 +17,12 @@ object ScrapingDocsThrows {
     }
     newList
 
+  def javaExceptionWrapper[A, E <: Exception](f: Unit => A): {f}A throws E = {
+    try {
+      f(())
+    } catch {case (e: E) => throw e}
+  }
+
   def main(args: Array[String]) = {
     val indexDoc: nodes.Document = Jsoup.connect("https://developer.mozilla.org/en-US/docs/Web/API").get()
     val links: List[nodes.Element] = fromMutableBuffer(indexDoc.select("h2#interfaces").nextAll.select("div.index a").asScala)
@@ -25,10 +31,7 @@ object ScrapingDocsThrows {
     val closures: List[Unit => (String, String, String, String, List[(String, String)]) throws IOException] =
       linkData.map{case (url, tooltip, name) => _ => {
         println("Scraping " + name)
-        val doc = Jsoup.connect("https://developer.mozilla.org" + url).get()
-        if (doc == null) {
-          throw new IOException("doc is null")
-        }
+        val doc = javaExceptionWrapper(_ => Jsoup.connect("https://developer.mozilla.org" + url).get())
         val summary = doc.select("article#wikiArticle > p").asScala.headOption match {
           case Some(n) => n.text; case None => ""
         }
